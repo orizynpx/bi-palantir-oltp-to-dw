@@ -2,7 +2,7 @@ import logging
 import os
 import time
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import Date, create_engine, text
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,9 @@ LOAD_ORDER = [
     "fact_sensor_telemetry_snapshot",
 ]
 TRUNCATE_TABLES = LOAD_ORDER
+TABLE_COLUMN_TYPES = {
+    "dim_sensor": {"valid_to": Date},
+}
 
 
 def load_all_dw_data(dw_tables: dict[str, pd.DataFrame]) -> list[dict]:
@@ -52,6 +55,7 @@ def load_all_dw_data(dw_tables: dict[str, pd.DataFrame]) -> list[dict]:
                     con=connection,
                     if_exists="append",
                     index=False,
+                    dtype=TABLE_COLUMN_TYPES.get(table_name),
                     method="multi",
                     chunksize=1000,
                 )
