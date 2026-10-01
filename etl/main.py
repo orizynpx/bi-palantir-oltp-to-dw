@@ -2,6 +2,7 @@ import logging
 import extract
 import transform
 import load
+import time
 
 logging.basicConfig(
     level=logging.INFO,
