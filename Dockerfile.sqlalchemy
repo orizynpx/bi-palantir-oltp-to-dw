@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends cron && rm -rf /lib/apt/lists/*
 
-RUN pip install --no-cache-dir sqlalchemy psycopg2-binary pandas
+RUN pip install --no-cache-dir sqlalchemy "psycopg[binary]" pandas
 
 COPY . /app
 
