@@ -1,1 +1,1 @@
-* * * * * root . /etc/environment; /usr/local/bin/python /app/main.py >> /tmp/cron.log 2>&1
+*/10 * * * * root . /etc/environment; /usr/local/bin/python /app/main.py >> /tmp/cron.log 2>&1

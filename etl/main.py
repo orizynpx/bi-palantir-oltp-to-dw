@@ -18,17 +18,21 @@ def main():
     pipeline_start = time.time()
     logger.info('ETL pipeline started')
 
-    raw_data, extract_metrics = extract.extract()
-    logger.info("Extracted %s source tables", len(extract_metrics))
+    try:
+        raw_data, extract_metrics = extract.extract()
+        logger.info("Extracted %s source tables", len(extract_metrics))
 
-    dw_tables, transform_metrics = transform.transform(raw_data)
-    logger.info("Transformation metrics: %s", transform_metrics)
+        dw_tables, transform_metrics = transform.transform(raw_data)
+        logger.info("Transformation metrics: %s", transform_metrics)
 
-    load_metrics = load.load(dw_tables)
-    logger.info("Load metrics: %s", load_metrics)
+        load_metrics = load.load(dw_tables)
+        logger.info("Load metrics: %s", load_metrics)
 
-    pipeline_duration = round(time.time() - pipeline_start, 2)
-    logger.info("ETL pipeline finished in %s seconds", pipeline_duration)
+        pipeline_duration = round(time.time() - pipeline_start, 2)
+        logger.info("ETL pipeline finished in %s seconds", pipeline_duration)
+    finally:
+        extract.engine.dispose()
+        load.engine.dispose()
 
 if __name__ == '__main__':
     main()
