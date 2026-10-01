@@ -2,17 +2,17 @@ FROM python:3.14.7-slim-trixie
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends cron && rm -rf /lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends cron dos2unix procps && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir sqlalchemy "psycopg[binary]" pandas
 
 COPY . /app
 
 COPY ./etl/crontab /etc/cron.d/etl-cron
-RUN chmod 0644 /etc/cron.d/etl-cron \
-    && crontab /etc/cron.d/etl-cron \
-    && touch /var/log/cron.log
+RUN dos2unix /etc/cron.d/etl-cron \
+    && chown root:root /etc/cron.d/etl-cron \
+    && chmod 0644 /etc/cron.d/etl-cron
 
-ENV PYTHONBUFFERED=1
+ENV PYTHONUNBUFFERED=1
 
-CMD ["cron", "-f"]
+CMD ["sh", "-c", "printenv > /etc/environment && cron -f -L 15"]
