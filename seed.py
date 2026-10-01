@@ -3,6 +3,7 @@ import json
 import os
 import random
 import sys
+import time
 import faker
 import numpy as np
 import psycopg2
@@ -30,11 +31,54 @@ def get_db_connection():
     )
 
 
+def wait_for_tables(conn, timeout_seconds=60):
+    """Wait for all required tables to exist in the database."""
+    required_tables = [
+        "edge_sensors",
+        "mission_deployments",
+        "target_categories",
+        "effectors",
+        "mission_sensors",
+        "sensor_telemetry_logs",
+        "threat_detections",
+        "targeting_effector_pairings",
+        "operator_decision_logs",
+    ]
+    
+    cur = conn.cursor()
+    start_time = time.time()
+    
+    while time.time() - start_time < timeout_seconds:
+        try:
+            cur.execute("""
+                SELECT table_name FROM information_schema.tables 
+                WHERE table_schema = 'public' AND table_name = ANY(%s)
+            """, (required_tables,))
+            existing_tables = set(row[0] for row in cur.fetchall())
+            
+            if len(existing_tables) == len(required_tables):
+                print(f"All {len(required_tables)} tables ready.")
+                return True
+            
+            missing = set(required_tables) - existing_tables
+            print(f"Waiting for tables: {missing}")
+            time.sleep(1)
+        except Exception as e:
+            print(f"Checking tables: {e}")
+            time.sleep(1)
+    
+    raise TimeoutError(f"Tables not ready after {timeout_seconds}s")
+
+
 def seed_database():
     conn = get_db_connection()
     cur = conn.cursor()
-    print("Connected to OLTP database. Truncating existing tables...")
-
+    print("Connected to OLTP database. Waiting for tables to initialize...")
+    
+    # Wait for all tables to be created by init.sql
+    wait_for_tables(conn)
+    
+    print("Truncating existing tables...")
     # Clear old data in transactional reverse dependency order
     cur.execute("""
         TRUNCATE TABLE 
@@ -49,6 +93,7 @@ def seed_database():
             edge_sensors
         RESTART IDENTITY CASCADE;
     """)
+    conn.commit()
 
     # --- 1. Populate Master Tables ---
     print("Seeding master tables...")
@@ -69,6 +114,7 @@ def seed_database():
         """,
         sensors,
     )
+    conn.commit()
 
     # Mission Deployments
     missions = []
@@ -99,10 +145,14 @@ def seed_database():
     cur.executemany(
         """
         INSERT INTO mission_deployments (mission_code, area_of_responsibility_geojson, start_time, end_time, mission_status, priority) 
-        VALUES (%s, %s, %s, %s, %s, %s) RETURNING mission_id
+        VALUES (%s, %s, %s, %s, %s, %s)
         """,
         missions,
     )
+    conn.commit()
+    
+    # Retrieve mission_ids after commit
+    cur.execute("SELECT mission_id FROM mission_deployments ORDER BY mission_id")
     mission_ids = [row[0] for row in cur.fetchall()]
 
     # Target Categories
@@ -116,10 +166,14 @@ def seed_database():
     cur.executemany(
         """
         INSERT INTO target_categories (category_name, threat_level, description) 
-        VALUES (%s, %s, %s) RETURNING category_id
+        VALUES (%s, %s, %s)
         """,
         categories,
     )
+    conn.commit()
+    
+    # Retrieve category_ids after commit
+    cur.execute("SELECT category_id FROM target_categories ORDER BY category_id")
     category_ids = [row[0] for row in cur.fetchall()]
 
     # Effectors
@@ -138,6 +192,7 @@ def seed_database():
         """,
         effectors,
     )
+    conn.commit()
 
     # --- 2. Populate Associative & Log Tables ---
     print("Seeding operational transactional logs...")
@@ -164,6 +219,7 @@ def seed_database():
         """,
         mission_sensors,
     )
+    conn.commit()
 
     # Sensor Telemetry Logs (~1,200 records)
     telemetry_logs = []
@@ -188,6 +244,7 @@ def seed_database():
         """,
         telemetry_logs,
     )
+    conn.commit()
 
     # Threat Detections (~1,000 records)
     confidence_scores = np.random.beta(a=5, b=2, size=1000)
@@ -210,13 +267,15 @@ def seed_database():
             random.choice(["v1.0.0", "v1.1.2-beta", "v1.2.1", "v2.0.0"]),
         ))
 
-    cur.executemany(
+    execute_values(
+        cur,
         """
         INSERT INTO threat_detections (sensor_id, mission_id, category_id, detected_at, confidence_score, latitude, longitude, bounding_box_json, edge_model_version) 
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING detection_id, detected_at, latitude, longitude
+        VALUES %s RETURNING detection_id, detected_at, latitude, longitude
         """,
         threat_detections,
     )
+    conn.commit()
     inserted_detections = cur.fetchall()
 
     # Targeting Effector Pairings & Operator Decision Logs
@@ -235,13 +294,15 @@ def seed_database():
             random.choice(["RECOMMENDED", "EXECUTED"]),
         ))
 
-    cur.executemany(
+    execute_values(
+        cur,
         """
         INSERT INTO targeting_effector_pairings (detection_id, effector_id, paired_at, kill_chain_latency_ms, target_latitude, target_longitude, pairing_status) 
-        VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING pairing_id, paired_at
+        VALUES %s RETURNING pairing_id, paired_at
         """,
         pairings,
     )
+    conn.commit()
     inserted_pairings = cur.fetchall()
 
     decisions = []
