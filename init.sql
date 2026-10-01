@@ -1,4 +1,5 @@
-CREATE EXTENSION IF NOT EXISTS postgis;
+-- PostGIS extension not available in postgres:16-alpine image
+-- CREATE EXTENSION IF NOT EXISTS postgis;
 
 CREATE TABLE edge_sensors (
     sensor_id VARCHAR(255) PRIMARY KEY,
