@@ -1,1 +1,1 @@
-* * * * * cd /app && /usr/local/bin/python main.py > /proc/1/fd/1 2>&1
+* * * * * root . /etc/environment; /usr/local/bin/python /app/main.py >> /tmp/cron.log 2>&1
