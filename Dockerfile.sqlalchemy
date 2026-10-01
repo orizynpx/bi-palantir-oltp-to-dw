@@ -1,0 +1,18 @@
+FROM python:3.14.7-slim-trixie
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends cron && rm -rf /lib/apt/lists/*
+
+RUN pip install --no-cache-dir sqlalchemy psycopg2-binary
+
+COPY . /app
+
+COPY crontab /etc/cron.d/etl-cron
+RUN chmod 0644 /etc/cron.d/etl-cron \
+    && crontab /etc/cron.d/etl-cron \
+    && touch /var/log/cron.log
+
+ENV PYTHONBUFFERED=1
+
+CMD ["cron", "-f"]
