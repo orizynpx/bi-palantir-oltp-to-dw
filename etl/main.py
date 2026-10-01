@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 def main():
     logging.basicConfig(filename='myapp.log', level=logging.INFO)
     logger.info('Started')
-    extract.extract()
+    data, metrics = extract.extract()
     transform.transform()
     load.load()
     logger.info('Finished')
